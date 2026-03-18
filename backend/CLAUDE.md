@@ -184,7 +184,9 @@ git push origin feature/your-feature
 - [x] Project setup (Laravel 12)
 - [x] Database migrations (users, wallets, transactions, merchants, providers)
 - [x] Payment provider interface (`PaymentProviderInterface`)
-- [x] Wave adapter implementation
+- [x] Wave adapter implementation (checkout, payout, refund, webhooks)
+- [x] Orange Money adapter implementation (OAuth2, checkout, payout)
+- [x] Provider factory for managing adapters
 - [x] Core Eloquent models:
   - `User` - Extended with phone auth, KYC, PIN
   - `UserProfile` - Profile details
@@ -195,15 +197,17 @@ git push origin feature/your-feature
   - `Merchant` - Business accounts
   - `MerchantStore` - Physical locations
   - `ApiKey` - Developer API keys with signing
+- [x] API routes structure (v1) - auth, wallets, payments, merchant API
+- [x] API key authentication middleware
+- [x] Payment provider config (Wave, Orange Money, Free Money, Wizall, E-Money)
 
 #### In Progress
-- [ ] API routes structure (v1)
-- [ ] Identity module (auth, registration)
+- [ ] Identity module controllers (auth, registration)
 
 #### Pending
 - [ ] Wallet service
 - [ ] Payment service
-- [ ] More provider adapters (OrangeMoney, FreeMoney)
+- [ ] More provider adapters (FreeMoney, Wizall, E-Money)
 - [ ] API tests
 - [ ] Flutter apps (customer, merchant)
 - [ ] Admin dashboard (Next.js)

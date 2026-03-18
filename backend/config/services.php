@@ -35,4 +35,42 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Payment Providers
+    |--------------------------------------------------------------------------
+    */
+
+    'wave' => [
+        'base_url' => env('WAVE_API_URL', 'https://api.wave.com'),
+        'api_key' => env('WAVE_API_KEY'),
+        'webhook_secret' => env('WAVE_WEBHOOK_SECRET'),
+    ],
+
+    'orange_money' => [
+        'base_url' => env('ORANGE_MONEY_API_URL', 'https://api.orange.com'),
+        'client_id' => env('ORANGE_MONEY_CLIENT_ID'),
+        'client_secret' => env('ORANGE_MONEY_CLIENT_SECRET'),
+        'merchant_key' => env('ORANGE_MONEY_MERCHANT_KEY'),
+        'notif_token' => env('ORANGE_MONEY_NOTIF_TOKEN'),
+    ],
+
+    'free_money' => [
+        'base_url' => env('FREE_MONEY_API_URL'),
+        'api_key' => env('FREE_MONEY_API_KEY'),
+        'merchant_id' => env('FREE_MONEY_MERCHANT_ID'),
+    ],
+
+    'wizall' => [
+        'base_url' => env('WIZALL_API_URL'),
+        'api_key' => env('WIZALL_API_KEY'),
+        'secret' => env('WIZALL_SECRET'),
+    ],
+
+    'emoney' => [
+        'base_url' => env('EMONEY_API_URL'),
+        'api_key' => env('EMONEY_API_KEY'),
+        'merchant_code' => env('EMONEY_MERCHANT_CODE'),
+    ],
+
 ];
