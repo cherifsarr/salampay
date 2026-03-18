@@ -1,0 +1,181 @@
+# SalamPay Payment Gateway Platform
+
+## Overview
+
+SalamPay is an independent payment gateway platform for Senegal, aggregating all local mobile money providers (Wave, Orange Money, Free Money, Wizall, E-Money) and card payments into a unified platform. Similar to PayPal, it enables wallet-based transactions, P2P transfers, and comprehensive merchant services.
+
+## System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        SALAMPAY PLATFORM                         │
+├─────────────────────────────────────────────────────────────────┤
+│  Customer App     Merchant App      Admin Dashboard              │
+│   (Flutter)        (Flutter)        (Next.js)                    │
+│      │                │                   │                      │
+│      └────────────────┼───────────────────┘                      │
+│                       ▼                                          │
+│              ┌─────────────────┐                                 │
+│              │   API Gateway   │                                 │
+│              └────────┬────────┘                                 │
+│                       │                                          │
+│   ┌───────────┬───────┼───────┬───────────┬───────────┐         │
+│   ▼           ▼       ▼       ▼           ▼           ▼         │
+│ Identity   Wallet  Payment  Merchant  Settlement   Provider     │
+│ Module     Module  Module   Module    Module       Module       │
+│                       │                                          │
+│              ┌────────┴────────┐                                 │
+│              │ Provider Layer  │                                 │
+│              └────────┬────────┘                                 │
+│   ┌─────┬─────┬───────┼───────┬─────┬─────┐                     │
+│   ▼     ▼     ▼       ▼       ▼     ▼     ▼                     │
+│ Wave  Orange  Free  Wizall  E-Money  Visa  Banks                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Repository Structure
+
+```
+SalamPay/
+├── backend/                    # Laravel API (this project)
+│   ├── app/
+│   │   ├── Modules/
+│   │   │   ├── Identity/       # Auth, KYC, Users
+│   │   │   ├── Wallet/         # Wallet management
+│   │   │   ├── Payment/        # Transactions, Checkout
+│   │   │   ├── Merchant/       # Merchant services
+│   │   │   ├── Settlement/     # Payouts, Reconciliation
+│   │   │   └── Provider/       # Payment provider adapters
+│   │   │       └── Adapters/
+│   │   │           ├── Wave/
+│   │   │           ├── OrangeMoney/
+│   │   │           ├── FreeMoney/
+│   │   │           ├── Wizall/
+│   │   │           └── EMoney/
+│   │   ├── Http/
+│   │   │   ├── Controllers/
+│   │   │   │   └── Api/V1/
+│   │   │   └── Middleware/
+│   │   └── Models/
+│   ├── config/
+│   ├── database/
+│   │   └── migrations/
+│   └── routes/
+│       └── api.php
+│
+├── apps/
+│   ├── customer/               # Flutter customer app
+│   └── merchant/               # Flutter merchant app
+│
+└── admin/                      # Next.js admin dashboard
+```
+
+## Modules
+
+### Identity Module
+- User registration (phone-based)
+- OTP authentication
+- KYC document management
+- User profiles
+
+### Wallet Module
+- Multi-currency wallets
+- Balance management
+- Transaction limits
+- Double-entry ledger
+
+### Payment Module
+- Checkout sessions
+- P2P transfers
+- Bill payments
+- QR code payments
+- Payment links
+
+### Merchant Module
+- Merchant onboarding (KYB)
+- Store management
+- QR code generation
+- Invoice creation
+- API key management
+
+### Settlement Module
+- Batch settlements
+- Reconciliation
+- Payout processing
+
+### Provider Module
+- Payment provider abstraction layer
+- Adapters for each provider:
+  - Wave
+  - Orange Money
+  - Free Money
+  - Wizall
+  - E-Money
+  - Card payments (Visa/Mastercard)
+
+## Database
+
+Using PostgreSQL for better JSON support and ACID compliance.
+
+### Key Tables
+- `users` - All user accounts
+- `wallets` - User/merchant wallets
+- `transactions` - All financial transactions
+- `ledger_entries` - Double-entry bookkeeping
+- `merchants` - Merchant accounts
+- `merchant_stores` - Physical store locations
+- `provider_accounts` - Payment provider credentials
+- `qr_codes` - Static/dynamic QR codes
+- `payment_links` - Payment link records
+- `invoices` - Merchant invoices
+- `settlement_batches` - Settlement records
+- `api_keys` - Developer API keys
+
+## API Versioning
+
+Base URL: `https://api.salampay.sn/v1`
+
+### Authentication
+- OAuth 2.0 for user authentication
+- API Keys for merchant integration
+- Request signing (HMAC-SHA256)
+
+## Environment Variables
+
+```env
+APP_NAME=SalamPay
+APP_ENV=local
+APP_DEBUG=true
+
+DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=salampay
+DB_USERNAME=salampay
+DB_PASSWORD=secret
+
+# Provider API Keys (encrypted)
+WAVE_API_KEY=
+WAVE_WEBHOOK_SECRET=
+ORANGE_MONEY_API_KEY=
+FREE_MONEY_API_KEY=
+
+# Security
+JWT_SECRET=
+ENCRYPTION_KEY=
+```
+
+## Git Workflow
+
+Same as Salam Ticket - feature branches, PRs to main, no direct pushes.
+
+```bash
+git checkout -b feature/your-feature
+git commit -m "feat: description"
+git push origin feature/your-feature
+# Create PR on GitHub
+```
+
+## Related Projects
+
+- **Salam Ticket** (`C:\Projects\CROUS\backendv2`) - University services platform, will integrate with SalamPay for payments

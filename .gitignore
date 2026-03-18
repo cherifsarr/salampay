@@ -1,0 +1,70 @@
+# Backend (Laravel)
+/backend/vendor/
+/backend/node_modules/
+/backend/.env
+/backend/.env.backup
+/backend/.phpunit.result.cache
+/backend/Homestead.json
+/backend/Homestead.yaml
+/backend/auth.json
+/backend/npm-debug.log
+/backend/yarn-error.log
+/backend/storage/*.key
+/backend/storage/logs/*
+/backend/storage/app/*
+/backend/storage/framework/cache/*
+/backend/storage/framework/sessions/*
+/backend/storage/framework/views/*
+/backend/bootstrap/cache/*
+
+# Flutter Apps
+/apps/customer/.dart_tool/
+/apps/customer/.packages
+/apps/customer/build/
+/apps/customer/.flutter-plugins
+/apps/customer/.flutter-plugins-dependencies
+/apps/customer/*.iml
+/apps/customer/.idea/
+/apps/customer/android/.gradle/
+/apps/customer/android/local.properties
+/apps/customer/ios/Pods/
+/apps/customer/ios/.symlinks/
+
+/apps/merchant/.dart_tool/
+/apps/merchant/.packages
+/apps/merchant/build/
+/apps/merchant/.flutter-plugins
+/apps/merchant/.flutter-plugins-dependencies
+/apps/merchant/*.iml
+/apps/merchant/.idea/
+/apps/merchant/android/.gradle/
+/apps/merchant/android/local.properties
+/apps/merchant/ios/Pods/
+/apps/merchant/ios/.symlinks/
+
+# Admin Dashboard (Next.js)
+/admin/node_modules/
+/admin/.next/
+/admin/out/
+/admin/.env
+/admin/.env.local
+/admin/.env.production
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temp
+*.tmp
+*.temp
