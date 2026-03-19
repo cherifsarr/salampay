@@ -271,8 +271,18 @@ git push origin feature/your-feature
   - Real-time payment status polling
   - Success/failure screens
 
-#### Pending
-- [ ] Admin dashboard (Next.js)
+#### Completed (Next.js Admin Dashboard)
+- [x] Next.js 14 project with TypeScript and Tailwind CSS
+- [x] Authentication system with login page
+- [x] Dashboard layout with collapsible sidebar navigation
+- [x] Dashboard overview with stats cards and recent transactions
+- [x] Customers management page with KYC verification
+- [x] Merchants management page with KYB verification
+- [x] Transactions page with filtering by type/status/provider
+- [x] Settlements page for merchant payout management
+- [x] Providers page for payment gateway monitoring
+- [x] Settings page with tabs for profile, security, notifications, fees, API
+- [x] Reusable components: StatsCard, StatusBadge, Pagination, Button, Loading
 
 ### Phase 2: Core Features
 - [ ] User registration & OTP auth
