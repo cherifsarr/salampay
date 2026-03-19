@@ -1,6 +1,8 @@
 import 'package:get/get.dart';
 import '../views/auth/login_view.dart';
 import '../views/dashboard/dashboard_view.dart';
+import '../views/pos/pos_view.dart';
+import '../views/pos/pos_client_display_view.dart';
 import '../views/qrcode/qr_code_list_view.dart';
 import '../views/qrcode/qr_code_create_view.dart';
 import '../views/payment_links/payment_link_list_view.dart';
@@ -10,6 +12,7 @@ import '../views/settlements/settlement_list_view.dart';
 import '../views/settings/settings_view.dart';
 import '../controllers/auth_controller.dart';
 import '../controllers/dashboard_controller.dart';
+import '../controllers/pos_controller.dart';
 import '../controllers/qr_code_controller.dart';
 import '../controllers/payment_link_controller.dart';
 import '../controllers/transaction_controller.dart';
@@ -18,6 +21,8 @@ import '../controllers/settlement_controller.dart';
 class AppRoutes {
   static const String login = '/login';
   static const String dashboard = '/dashboard';
+  static const String pos = '/pos';
+  static const String posClientDisplay = '/pos/client-display';
   static const String qrCodes = '/qr-codes';
   static const String qrCodeCreate = '/qr-codes/create';
   static const String paymentLinks = '/payment-links';
@@ -71,5 +76,15 @@ class AppRoutes {
       binding: BindingsBuilder(() => Get.lazyPut(() => SettlementController())),
     ),
     GetPage(name: settings, page: () => const SettingsView()),
+    GetPage(
+      name: pos,
+      page: () => const PosView(),
+      binding: BindingsBuilder(() => Get.lazyPut(() => PosController())),
+    ),
+    GetPage(
+      name: posClientDisplay,
+      page: () => const PosClientDisplayView(),
+      binding: BindingsBuilder(() => Get.lazyPut(() => PosController())),
+    ),
   ];
 }

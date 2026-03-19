@@ -75,6 +75,10 @@ class ApiService extends GetxService {
     return _delete('/qr-codes/$id');
   }
 
+  Future<ApiResponse> getQrCodeStatus(String id) async {
+    return _get('/qr-codes/$id/status');
+  }
+
   // Payment Links
   Future<ApiResponse> getPaymentLinks({int page = 1}) async {
     return _get('/payment-links', queryParams: {'page': page});

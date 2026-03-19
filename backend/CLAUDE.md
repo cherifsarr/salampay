@@ -264,6 +264,12 @@ git push origin feature/your-feature
 - [x] Transaction list view with details
 - [x] Settlement list view with payout requests
 - [x] Settings view with business profile
+- [x] POS (Point of Sale) system:
+  - Numeric keypad for amount entry
+  - Dynamic QR code generation for payments
+  - Client display view for secondary screens
+  - Real-time payment status polling
+  - Success/failure screens
 
 #### Pending
 - [ ] Admin dashboard (Next.js)

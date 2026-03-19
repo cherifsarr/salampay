@@ -85,6 +85,7 @@ class DashboardView extends GetView<DashboardController> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
+                      _buildQuickAction(Icons.point_of_sale, 'POS', () => Get.toNamed(AppRoutes.pos)),
                       _buildQuickAction(Icons.qr_code, 'QR Code', () => Get.toNamed(AppRoutes.qrCodes)),
                       _buildQuickAction(Icons.link, 'Liens', () => Get.toNamed(AppRoutes.paymentLinks)),
                       _buildQuickAction(Icons.account_balance_wallet, 'Versement', () => Get.toNamed(AppRoutes.settlements)),
