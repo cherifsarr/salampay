@@ -71,6 +71,12 @@ class Merchant extends Model
             ->where('wallet_type', 'main');
     }
 
+    // Alias for mainWallet
+    public function wallet(): HasOne
+    {
+        return $this->mainWallet();
+    }
+
     public function qrCodes(): HasMany
     {
         return $this->hasMany(QrCode::class);

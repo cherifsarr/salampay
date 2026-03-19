@@ -197,16 +197,32 @@ git push origin feature/your-feature
   - `Merchant` - Business accounts
   - `MerchantStore` - Physical locations
   - `ApiKey` - Developer API keys with signing
+  - `KycDocument` - KYC document management
+  - `QrCode` - Static/dynamic QR codes
+  - `PaymentLink` - Payment link records
+  - `Invoice` - Merchant invoices
+  - `SettlementBatch` - Settlement records
 - [x] API routes structure (v1) - auth, wallets, payments, merchant API
 - [x] API key authentication middleware
 - [x] Payment provider config (Wave, Orange Money, Free Money, Wizall, E-Money)
-
-#### In Progress
-- [ ] Identity module controllers (auth, registration)
+- [x] Identity module controllers:
+  - `AuthController` - Register, login, OTP, password reset, PIN management
+  - `UserController` - Profile management, KYC document upload
+- [x] Payment module controllers:
+  - `PaymentController` - Deposits, withdrawals, P2P transfers, QR payments
+  - `TransactionController` - Transaction history
+  - `WalletController` - Wallet management
+  - `WebhookController` - Wave, Orange Money webhooks
+- [x] Merchant API controllers:
+  - `CheckoutController` - Checkout sessions
+  - `QrCodeController` - QR code management
+  - `PaymentLinkController` - Payment links
+  - `InvoiceController` - Invoice management
+  - `TransactionController` - Merchant transactions
+  - `SettlementController` - Settlement batches
+  - `AccountController` - Merchant account info
 
 #### Pending
-- [ ] Wallet service
-- [ ] Payment service
 - [ ] More provider adapters (FreeMoney, Wizall, E-Money)
 - [ ] API tests
 - [ ] Flutter apps (customer, merchant)
