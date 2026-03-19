@@ -246,8 +246,26 @@ git push origin feature/your-feature
 - [x] Settings view with profile and security options
 - [x] App routing with GetX navigation
 
+#### Completed (Flutter Merchant App)
+- [x] Flutter merchant app project setup with GetX architecture
+- [x] Theme configuration with business blue colors
+- [x] Data models (Merchant, QrCode, PaymentLink, Transaction, Settlement)
+- [x] API service for merchant endpoints
+- [x] Auth controller with email/password login
+- [x] Dashboard controller with stats and recent transactions
+- [x] QR code controller with create/delete functionality
+- [x] Payment link controller for link management
+- [x] Transaction controller with filtering and refunds
+- [x] Settlement controller with payout requests
+- [x] Login view for merchants
+- [x] Dashboard view with sales stats and quick actions
+- [x] QR code management views (list, create, detail)
+- [x] Payment link management views (list, create)
+- [x] Transaction list view with details
+- [x] Settlement list view with payout requests
+- [x] Settings view with business profile
+
 #### Pending
-- [ ] Flutter merchant app
 - [ ] Admin dashboard (Next.js)
 
 ### Phase 2: Core Features
