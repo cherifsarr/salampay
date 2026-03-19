@@ -148,6 +148,16 @@ class Wallet extends Model
     }
 
     // Helpers
+    public function getAvailableBalance(): float
+    {
+        return (float) $this->available_balance;
+    }
+
+    public function getHeldBalance(): float
+    {
+        return $this->activeHolds()->sum('amount');
+    }
+
     public function isActive(): bool
     {
         return $this->status === 'active';

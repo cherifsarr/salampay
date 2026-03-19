@@ -6,15 +6,18 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, SoftDeletes;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     protected $fillable = [
         'uuid',
@@ -28,6 +31,9 @@ class User extends Authenticatable
         'status',
         'language',
         'timezone',
+        'phone_verified_at',
+        'last_login_at',
+        'last_login_ip',
     ];
 
     protected $hidden = [
@@ -64,12 +70,12 @@ class User extends Authenticatable
         return $this->hasOne(UserProfile::class);
     }
 
-    public function wallets(): HasMany
+    public function wallets(): MorphMany
     {
         return $this->morphMany(Wallet::class, 'owner');
     }
 
-    public function mainWallet(): HasOne
+    public function mainWallet(): MorphOne
     {
         return $this->morphOne(Wallet::class, 'owner')
             ->where('wallet_type', 'main');
