@@ -222,9 +222,16 @@ git push origin feature/your-feature
   - `SettlementController` - Settlement batches
   - `AccountController` - Merchant account info
 
+#### Completed (continued)
+- [x] Free Money adapter implementation (checkout, payout, refund, webhooks)
+- [x] Wizall adapter implementation (checkout, payout, refund, webhooks)
+- [x] E-Money adapter implementation (checkout, payout, refund, webhooks)
+- [x] API tests (26 tests passing)
+  - AuthTest (11 tests) - Registration, login, OTP, password reset
+  - WalletTest (6 tests) - Balance, holds, transactions
+  - PaymentTest (9 tests) - Deposits, withdrawals, transfers
+
 #### Pending
-- [ ] More provider adapters (FreeMoney, Wizall, E-Money)
-- [ ] API tests
 - [ ] Flutter apps (customer, merchant)
 - [ ] Admin dashboard (Next.js)
 
