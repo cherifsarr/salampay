@@ -231,8 +231,23 @@ git push origin feature/your-feature
   - WalletTest (6 tests) - Balance, holds, transactions
   - PaymentTest (9 tests) - Deposits, withdrawals, transfers
 
+#### Completed (Flutter Customer App)
+- [x] Flutter customer app project setup with GetX architecture
+- [x] Theme configuration with custom colors
+- [x] Data models (User, Wallet, Transaction)
+- [x] API service with Dio and secure storage
+- [x] Auth controller with full authentication flow
+- [x] Home controller and wallet controller
+- [x] Payment controller for deposits, withdrawals, transfers
+- [x] Authentication views (Login, Register, OTP, PIN setup)
+- [x] Home view with wallet card and quick actions
+- [x] Wallet view with transaction history
+- [x] Payment views (Deposit, Transfer, Withdraw, QR Scan)
+- [x] Settings view with profile and security options
+- [x] App routing with GetX navigation
+
 #### Pending
-- [ ] Flutter apps (customer, merchant)
+- [ ] Flutter merchant app
 - [ ] Admin dashboard (Next.js)
 
 ### Phase 2: Core Features
