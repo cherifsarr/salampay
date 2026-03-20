@@ -46,6 +46,30 @@ Route::prefix('v1')->group(function () {
     });
 
     // =================================================================
+    // PUBLIC CHECKOUT ROUTES (Guest Payments - No SalamPay Account Required)
+    // =================================================================
+
+    Route::prefix('checkout')->group(function () {
+        // Get available payment providers
+        Route::get('/providers', [\App\Http\Controllers\Api\V1\Public\CheckoutController::class, 'providers']);
+
+        // Checkout session (from merchant API)
+        Route::get('/sessions/{id}', [\App\Http\Controllers\Api\V1\Public\CheckoutController::class, 'resolve']);
+        Route::post('/sessions/{id}/pay', [\App\Http\Controllers\Api\V1\Public\CheckoutController::class, 'pay']);
+
+        // QR code payments
+        Route::post('/qr/resolve', [\App\Http\Controllers\Api\V1\Public\CheckoutController::class, 'resolveQr']);
+        Route::post('/qr/pay', [\App\Http\Controllers\Api\V1\Public\CheckoutController::class, 'payQr']);
+
+        // Payment links
+        Route::get('/links/{code}', [\App\Http\Controllers\Api\V1\Public\CheckoutController::class, 'resolvePaymentLink']);
+        Route::post('/links/{code}/pay', [\App\Http\Controllers\Api\V1\Public\CheckoutController::class, 'payPaymentLink']);
+
+        // Payment status (public, by reference)
+        Route::get('/status/{reference}', [\App\Http\Controllers\Api\V1\Public\CheckoutController::class, 'status']);
+    });
+
+    // =================================================================
     // AUTHENTICATED USER ROUTES
     // =================================================================
 
