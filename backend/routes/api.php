@@ -101,6 +101,10 @@ Route::prefix('v1')->group(function () {
 
         // Payments (Customer)
         Route::prefix('payments')->group(function () {
+            // Fee preview and limits
+            Route::get('/fee-preview', [\App\Http\Controllers\Api\V1\PaymentController::class, 'feePreview']);
+            Route::get('/limits', [\App\Http\Controllers\Api\V1\PaymentController::class, 'walletLimits']);
+
             // Deposits
             Route::get('/deposit/methods', [\App\Http\Controllers\Api\V1\PaymentController::class, 'depositMethods']);
             Route::post('/deposit/initiate', [\App\Http\Controllers\Api\V1\PaymentController::class, 'initiateDeposit']);

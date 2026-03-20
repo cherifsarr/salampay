@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Transaction;
 use App\Modules\Provider\ProviderFactory;
+use App\Services\TransactionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,7 +14,8 @@ use Illuminate\Support\Facades\Log;
 class WebhookController extends Controller
 {
     public function __construct(
-        private ProviderFactory $providerFactory
+        private ProviderFactory $providerFactory,
+        private TransactionService $transactionService
     ) {}
 
     /**
@@ -136,46 +138,50 @@ class WebhookController extends Controller
             return;
         }
 
-        DB::transaction(function () use ($externalRef, $payload, $provider) {
-            $transaction = Transaction::where('external_reference', $externalRef)
-                ->where('provider', $provider)
-                ->lockForUpdate()
-                ->first();
+        $transaction = Transaction::where('external_reference', $externalRef)
+            ->where('provider', $provider)
+            ->first();
 
-            if (!$transaction) {
-                Log::warning('Transaction not found for webhook', [
-                    'external_ref' => $externalRef,
-                    'provider' => $provider,
-                ]);
-                return;
-            }
-
-            if ($transaction->status === 'completed') {
-                Log::info('Transaction already completed', ['id' => $transaction->id]);
-                return;
-            }
-
-            // Update transaction
-            $transaction->update([
-                'status' => 'completed',
-                'completed_at' => now(),
-                'provider_transaction_id' => $this->extractProviderTransactionId($payload, $provider),
-                'provider_response' => $payload,
-            ]);
-
-            // Credit destination wallet
-            if ($transaction->destination_wallet_id) {
-                $transaction->destinationWallet->credit(
-                    $transaction->net_amount,
-                    $transaction
-                );
-            }
-
-            Log::info('Transaction completed via webhook', [
-                'transaction_id' => $transaction->id,
+        if (!$transaction) {
+            Log::warning('Transaction not found for webhook', [
+                'external_ref' => $externalRef,
                 'provider' => $provider,
             ]);
-        });
+            return;
+        }
+
+        if ($transaction->status === 'completed') {
+            Log::info('Transaction already completed', ['id' => $transaction->id]);
+            return;
+        }
+
+        // Update provider info
+        $transaction->update([
+            'provider_transaction_id' => $this->extractProviderTransactionId($payload, $provider),
+            'provider_response' => $payload,
+        ]);
+
+        // Complete transaction using service (handles accounting)
+        if ($transaction->type === 'deposit') {
+            $this->transactionService->completeDeposit($transaction);
+        } elseif (in_array($transaction->type, ['payment_link', 'qr_payment', 'payment'])) {
+            // Merchant payment - determine if guest
+            $isGuest = !$transaction->source_wallet_id &&
+                       ($transaction->metadata['is_guest'] ?? true);
+
+            $this->transactionService->completeMerchantPayment(
+                $transaction,
+                null,
+                $isGuest,
+                $provider
+            );
+        }
+
+        Log::info('Transaction completed via webhook', [
+            'transaction_id' => $transaction->id,
+            'provider' => $provider,
+            'type' => $transaction->type,
+        ]);
     }
 
     private function handleCheckoutExpired(array $payload, string $provider): void
@@ -224,7 +230,14 @@ class WebhookController extends Controller
             ->first();
 
         if ($transaction && $transaction->status !== 'completed') {
-            $transaction->markAsCompleted();
+            // Update provider info
+            $transaction->update([
+                'provider_transaction_id' => $this->extractProviderTransactionId($payload, $provider),
+                'provider_response' => $payload,
+            ]);
+
+            // Complete using service (handles accounting)
+            $this->transactionService->completeWithdrawal($transaction);
         }
     }
 
@@ -235,26 +248,17 @@ class WebhookController extends Controller
             return;
         }
 
-        DB::transaction(function () use ($externalRef, $payload, $provider) {
-            $transaction = Transaction::where('external_reference', $externalRef)
-                ->where('provider', $provider)
-                ->where('type', 'withdrawal')
-                ->lockForUpdate()
-                ->first();
+        $transaction = Transaction::where('external_reference', $externalRef)
+            ->where('provider', $provider)
+            ->where('type', 'withdrawal')
+            ->first();
 
-            if ($transaction && in_array($transaction->status, ['pending', 'processing'])) {
-                // Refund the source wallet
-                if ($transaction->source_wallet_id) {
-                    $transaction->sourceWallet->credit(
-                        $transaction->amount,
-                        $transaction
-                    );
-                }
+        if ($transaction && in_array($transaction->status, ['pending', 'processing'])) {
+            $reason = $payload['failure_reason'] ?? 'Payout failed';
 
-                $reason = $payload['failure_reason'] ?? 'Payout failed';
-                $transaction->markAsFailed($reason);
-            }
-        });
+            // Refund using service (handles accounting)
+            $this->transactionService->refundFailedWithdrawal($transaction, $reason);
+        }
     }
 
     private function extractExternalReference(array $payload, string $provider): ?string

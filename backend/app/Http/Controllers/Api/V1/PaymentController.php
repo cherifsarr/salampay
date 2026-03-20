@@ -7,6 +7,7 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Modules\Provider\ProviderFactory;
+use App\Services\TransactionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,14 +17,17 @@ use Illuminate\Support\Str;
 class PaymentController extends Controller
 {
     public function __construct(
-        private ProviderFactory $providerFactory
+        private ProviderFactory $providerFactory,
+        private TransactionService $transactionService
     ) {}
 
     /**
-     * Get available deposit methods
+     * Get available deposit methods with fee preview
      */
     public function depositMethods(Request $request): JsonResponse
     {
+        $sampleAmount = 10000; // For fee preview
+
         $methods = [
             [
                 'id' => 'wave',
@@ -31,8 +35,7 @@ class PaymentController extends Controller
                 'icon' => 'wave',
                 'min_amount' => 100,
                 'max_amount' => 1000000,
-                'fee_type' => 'percentage',
-                'fee_value' => 1,
+                'fee_preview' => $this->transactionService->getFeePreview('deposit', $sampleAmount, 'wave'),
                 'available' => $this->providerFactory->has('wave'),
             ],
             [
@@ -41,8 +44,7 @@ class PaymentController extends Controller
                 'icon' => 'orange_money',
                 'min_amount' => 100,
                 'max_amount' => 500000,
-                'fee_type' => 'percentage',
-                'fee_value' => 1.5,
+                'fee_preview' => $this->transactionService->getFeePreview('deposit', $sampleAmount, 'orange_money'),
                 'available' => $this->providerFactory->has('orange_money'),
             ],
             [
@@ -51,8 +53,7 @@ class PaymentController extends Controller
                 'icon' => 'free_money',
                 'min_amount' => 100,
                 'max_amount' => 500000,
-                'fee_type' => 'fixed',
-                'fee_value' => 50,
+                'fee_preview' => $this->transactionService->getFeePreview('deposit', $sampleAmount, 'free_money'),
                 'available' => $this->providerFactory->has('free_money'),
             ],
         ];
@@ -97,28 +98,30 @@ class PaymentController extends Controller
             ], 400);
         }
 
-        // Calculate fee
-        $fee = $this->calculateDepositFee($amount, $providerName);
+        // Validate deposit against wallet limits
+        $validation = $this->transactionService->validateDeposit($wallet, $amount);
+        if (!$validation['valid']) {
+            return response()->json([
+                'success' => false,
+                'message' => $validation['message'],
+                'errors' => $validation['errors'],
+            ], 400);
+        }
 
         try {
             $provider = $this->providerFactory->make($providerName);
 
-            // Create transaction record
-            $transaction = Transaction::create([
-                'uuid' => Str::uuid(),
-                'reference' => Transaction::generateReference(),
-                'type' => 'deposit',
-                'amount' => $amount,
-                'currency' => 'XOF',
-                'fee_amount' => $fee,
-                'net_amount' => $amount - $fee,
-                'destination_wallet_id' => $wallet->id,
-                'destination_user_id' => $user->id,
-                'provider' => $providerName,
-                'status' => 'pending',
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-            ]);
+            // Create transaction record using service
+            $transaction = $this->transactionService->createDeposit(
+                $user,
+                $wallet,
+                $amount,
+                $providerName,
+                [
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                ]
+            );
 
             // Create checkout session with provider
             $checkoutData = $provider->createCheckout([
@@ -142,8 +145,8 @@ class PaymentController extends Controller
                     'transaction_id' => $transaction->uuid,
                     'reference' => $transaction->reference,
                     'amount' => $amount,
-                    'fee' => $fee,
-                    'net_amount' => $amount - $fee,
+                    'fee' => (float) $transaction->fee_amount,
+                    'net_amount' => (float) $transaction->net_amount,
                     'checkout_url' => $checkoutData['wave_launch_url'] ?? $checkoutData['payment_url'] ?? null,
                     'expires_at' => $checkoutData['when_expires'] ?? null,
                 ],
@@ -193,10 +196,12 @@ class PaymentController extends Controller
     }
 
     /**
-     * Get available withdrawal methods
+     * Get available withdrawal methods with fee preview
      */
     public function withdrawMethods(Request $request): JsonResponse
     {
+        $sampleAmount = 10000;
+
         $methods = [
             [
                 'id' => 'wave',
@@ -204,8 +209,7 @@ class PaymentController extends Controller
                 'icon' => 'wave',
                 'min_amount' => 500,
                 'max_amount' => 500000,
-                'fee_type' => 'percentage',
-                'fee_value' => 1,
+                'fee_preview' => $this->transactionService->getFeePreview('withdrawal', $sampleAmount, 'wave'),
                 'available' => true,
             ],
             [
@@ -214,8 +218,7 @@ class PaymentController extends Controller
                 'icon' => 'orange_money',
                 'min_amount' => 500,
                 'max_amount' => 300000,
-                'fee_type' => 'percentage',
-                'fee_value' => 1.5,
+                'fee_preview' => $this->transactionService->getFeePreview('withdrawal', $sampleAmount, 'orange_money'),
                 'available' => true,
             ],
         ];
@@ -261,66 +264,61 @@ class PaymentController extends Controller
         $amount = (float) $request->amount;
         $wallet = $user->mainWallet;
 
-        // Check balance
-        if (!$wallet || $wallet->getAvailableBalance() < $amount) {
+        if (!$wallet) {
             return response()->json([
                 'success' => false,
-                'message' => 'Insufficient balance',
+                'message' => 'Wallet not found',
             ], 400);
         }
 
-        $fee = $this->calculateWithdrawFee($amount, $request->provider);
+        // Validate withdrawal against wallet limits
+        $validation = $this->transactionService->validateWithdrawal($wallet, $amount);
+        if (!$validation['valid']) {
+            return response()->json([
+                'success' => false,
+                'message' => $validation['message'],
+                'errors' => $validation['errors'],
+            ], 400);
+        }
 
         try {
-            return DB::transaction(function () use ($request, $user, $wallet, $amount, $fee) {
-                $provider = $this->providerFactory->make($request->provider);
+            // Create withdrawal transaction
+            $transaction = $this->transactionService->createWithdrawal(
+                $user,
+                $wallet,
+                $amount,
+                $request->provider,
+                $request->recipient_phone,
+                ['ip_address' => $request->ip()]
+            );
 
-                // Debit wallet
-                $transaction = Transaction::create([
-                    'uuid' => Str::uuid(),
-                    'reference' => Transaction::generateReference(),
-                    'type' => 'withdrawal',
+            $provider = $this->providerFactory->make($request->provider);
+
+            // Initiate payout
+            $payoutResult = $provider->payout([
+                'amount' => $transaction->net_amount,
+                'currency' => 'XOF',
+                'recipient_phone' => $request->recipient_phone,
+                'client_reference' => $transaction->reference,
+            ]);
+
+            $transaction->update([
+                'external_reference' => $payoutResult['id'] ?? null,
+                'status' => 'processing',
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Withdrawal initiated',
+                'data' => [
+                    'transaction_id' => $transaction->uuid,
+                    'reference' => $transaction->reference,
                     'amount' => $amount,
-                    'currency' => 'XOF',
-                    'fee_amount' => $fee,
-                    'net_amount' => $amount - $fee,
-                    'source_wallet_id' => $wallet->id,
-                    'source_user_id' => $user->id,
-                    'provider' => $request->provider,
-                    'status' => 'pending',
-                    'ip_address' => $request->ip(),
-                    'metadata' => ['recipient_phone' => $request->recipient_phone],
-                ]);
-
-                // Debit the wallet
-                $wallet->debit($amount, $transaction);
-
-                // Initiate payout
-                $payoutResult = $provider->payout([
-                    'amount' => $amount - $fee,
-                    'currency' => 'XOF',
-                    'recipient_phone' => $request->recipient_phone,
-                    'client_reference' => $transaction->reference,
-                ]);
-
-                $transaction->update([
-                    'external_reference' => $payoutResult['id'] ?? null,
+                    'fee' => (float) $transaction->fee_amount,
+                    'net_amount' => (float) $transaction->net_amount,
                     'status' => 'processing',
-                ]);
-
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Withdrawal initiated',
-                    'data' => [
-                        'transaction_id' => $transaction->uuid,
-                        'reference' => $transaction->reference,
-                        'amount' => $amount,
-                        'fee' => $fee,
-                        'net_amount' => $amount - $fee,
-                        'status' => 'processing',
-                    ],
-                ]);
-            });
+                ],
+            ]);
 
         } catch (\Exception $e) {
             return response()->json([
@@ -424,56 +422,43 @@ class PaymentController extends Controller
             ], 400);
         }
 
-        // Check balance
-        if ($sourceWallet->getAvailableBalance() < $amount) {
+        // Validate transfer against wallet limits
+        $validation = $this->transactionService->validateTransfer($sourceWallet, $destWallet, $amount);
+        if (!$validation['valid']) {
             return response()->json([
                 'success' => false,
-                'message' => 'Insufficient balance',
+                'message' => $validation['message'],
+                'errors' => $validation['errors'],
             ], 400);
         }
 
         try {
-            return DB::transaction(function () use ($user, $recipient, $sourceWallet, $destWallet, $amount, $request) {
-                $fee = 0; // P2P transfers are free
+            $transaction = $this->transactionService->createTransfer(
+                $user,
+                $recipient,
+                $sourceWallet,
+                $destWallet,
+                $amount,
+                $request->input('description'),
+                ['ip_address' => $request->ip()]
+            );
 
-                $transaction = Transaction::create([
-                    'uuid' => Str::uuid(),
-                    'reference' => Transaction::generateReference(),
-                    'type' => 'transfer_p2p',
+            return response()->json([
+                'success' => true,
+                'message' => 'Transfer successful',
+                'data' => [
+                    'transaction_id' => $transaction->uuid,
+                    'reference' => $transaction->reference,
                     'amount' => $amount,
-                    'currency' => 'XOF',
-                    'fee_amount' => $fee,
-                    'net_amount' => $amount,
-                    'source_wallet_id' => $sourceWallet->id,
-                    'source_user_id' => $user->id,
-                    'destination_wallet_id' => $destWallet->id,
-                    'destination_user_id' => $recipient->id,
-                    'provider' => 'internal',
-                    'status' => 'completed',
-                    'completed_at' => now(),
-                    'description' => $request->input('description'),
-                    'ip_address' => $request->ip(),
-                ]);
-
-                // Execute transfer
-                $sourceWallet->debit($amount, $transaction);
-                $destWallet->credit($amount, $transaction);
-
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Transfer successful',
-                    'data' => [
-                        'transaction_id' => $transaction->uuid,
-                        'reference' => $transaction->reference,
-                        'amount' => $amount,
-                        'recipient' => [
-                            'name' => $recipient->name,
-                            'phone' => $this->maskPhone($recipient->phone),
-                        ],
-                        'new_balance' => (float) $sourceWallet->fresh()->balance,
+                    'fee' => (float) $transaction->fee_amount,
+                    'net_amount' => (float) $transaction->net_amount,
+                    'recipient' => [
+                        'name' => $recipient->name,
+                        'phone' => $this->maskPhone($recipient->phone),
                     ],
-                ]);
-            });
+                    'new_balance' => (float) $sourceWallet->fresh()->balance,
+                ],
+            ]);
 
         } catch (\Exception $e) {
             return response()->json([
@@ -511,9 +496,64 @@ class PaymentController extends Controller
                 'transaction_id' => $transaction->uuid,
                 'reference' => $transaction->reference,
                 'amount' => (float) $transaction->amount,
+                'fee' => (float) $transaction->fee_amount,
                 'status' => $transaction->status,
                 'created_at' => $transaction->created_at->toISOString(),
             ],
+        ]);
+    }
+
+    /**
+     * Get wallet limits and usage summary
+     */
+    public function walletLimits(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $wallet = $user->mainWallet;
+
+        if (!$wallet) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Wallet not found',
+            ], 400);
+        }
+
+        $summary = $this->transactionService->getWalletUsageSummary($wallet);
+
+        return response()->json([
+            'success' => true,
+            'data' => $summary,
+        ]);
+    }
+
+    /**
+     * Preview transaction fee
+     */
+    public function feePreview(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'type' => ['required', 'in:deposit,withdrawal,transfer'],
+            'amount' => ['required', 'numeric', 'min:1'],
+            'provider' => ['sometimes', 'string'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $preview = $this->transactionService->getFeePreview(
+            $request->type,
+            (float) $request->amount,
+            $request->provider
+        );
+
+        return response()->json([
+            'success' => true,
+            'data' => $preview,
         ]);
     }
 
@@ -577,25 +617,6 @@ class PaymentController extends Controller
     }
 
     // Helper methods
-
-    private function calculateDepositFee(float $amount, string $provider): float
-    {
-        return match ($provider) {
-            'wave' => round($amount * 0.01, 2), // 1%
-            'orange_money' => round($amount * 0.015, 2), // 1.5%
-            'free_money' => 50, // Fixed 50 XOF
-            default => 0,
-        };
-    }
-
-    private function calculateWithdrawFee(float $amount, string $provider): float
-    {
-        return match ($provider) {
-            'wave' => round($amount * 0.01, 2), // 1%
-            'orange_money' => round($amount * 0.015, 2), // 1.5%
-            default => 0,
-        };
-    }
 
     private function normalizePhone(string $phone): string
     {
