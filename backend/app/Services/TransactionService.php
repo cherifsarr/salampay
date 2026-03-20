@@ -6,8 +6,8 @@ use App\Models\Merchant;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\Wallet;
-use App\Modules\Accounting\Models\FeeConfiguration;
 use App\Modules\Accounting\Services\AccountingService;
+use App\Modules\Accounting\Services\TaxService;
 use App\Modules\Accounting\Services\WalletLimitService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -17,7 +17,8 @@ class TransactionService
 {
     public function __construct(
         private AccountingService $accountingService,
-        private WalletLimitService $walletLimitService
+        private WalletLimitService $walletLimitService,
+        private TaxService $taxService
     ) {}
 
     /**
@@ -34,6 +35,23 @@ class TransactionService
             $amount,
             $provider,
             $accountType
+        );
+    }
+
+    /**
+     * Calculate tax for a transaction
+     */
+    public function calculateTax(
+        string $transactionType,
+        float $amount,
+        float $feeAmount = 0,
+        ?string $provider = null
+    ): array {
+        return $this->taxService->calculateTaxes(
+            $transactionType,
+            $amount,
+            $feeAmount,
+            $provider
         );
     }
 
@@ -178,6 +196,10 @@ class TransactionService
         $feeResult = $this->calculateFee('deposit', $amount, $provider, 'customer');
         $fee = $feeResult['fee'];
 
+        // Calculate tax
+        $taxResult = $this->calculateTax('deposit', $amount, $fee, $provider);
+        $tax = $taxResult['total_tax'];
+
         $transaction = Transaction::create([
             'uuid' => Str::uuid(),
             'reference' => Transaction::generateReference(),
@@ -185,12 +207,17 @@ class TransactionService
             'amount' => $amount,
             'currency' => 'XOF',
             'fee_amount' => $fee,
-            'net_amount' => $amount - $fee,
+            'tax_amount' => $tax,
+            'net_amount' => $amount - $fee - $tax,
             'destination_wallet_id' => $wallet->id,
             'destination_user_id' => $user->id,
             'provider' => $provider,
             'status' => 'pending',
-            'metadata' => array_merge($metadata, ['fee_config' => $feeResult]),
+            'metadata' => array_merge($metadata, [
+                'fee_config' => $feeResult,
+                'tax_breakdown' => $taxResult,
+            ]),
+            'tax_breakdown' => $taxResult,
         ]);
 
         return $transaction;
@@ -230,6 +257,14 @@ class TransactionService
             // Record in accounting ledger
             $this->recordAccountingEntry($transaction);
 
+            // Record tax collection
+            if ($transaction->tax_amount > 0) {
+                $this->taxService->recordTaxCollection(
+                    $transaction,
+                    $transaction->tax_breakdown ?? $transaction->metadata['tax_breakdown'] ?? []
+                );
+            }
+
             // Record platform earnings
             if ($transaction->fee_amount > 0) {
                 $this->accountingService->recordEarnings(
@@ -243,6 +278,7 @@ class TransactionService
                 'transaction_id' => $transaction->id,
                 'amount' => $transaction->amount,
                 'fee' => $transaction->fee_amount,
+                'tax' => $transaction->tax_amount,
             ]);
         });
     }
@@ -262,7 +298,11 @@ class TransactionService
         $feeResult = $this->calculateFee('withdrawal', $amount, $provider, 'customer');
         $fee = $feeResult['fee'];
 
-        return DB::transaction(function () use ($user, $wallet, $amount, $fee, $feeResult, $provider, $recipientPhone, $metadata) {
+        // Calculate tax
+        $taxResult = $this->calculateTax('withdrawal', $amount, $fee, $provider);
+        $tax = $taxResult['total_tax'];
+
+        return DB::transaction(function () use ($user, $wallet, $amount, $fee, $tax, $feeResult, $taxResult, $provider, $recipientPhone, $metadata) {
             $transaction = Transaction::create([
                 'uuid' => Str::uuid(),
                 'reference' => Transaction::generateReference(),
@@ -270,7 +310,8 @@ class TransactionService
                 'amount' => $amount,
                 'currency' => 'XOF',
                 'fee_amount' => $fee,
-                'net_amount' => $amount - $fee,
+                'tax_amount' => $tax,
+                'net_amount' => $amount - $fee - $tax,
                 'source_wallet_id' => $wallet->id,
                 'source_user_id' => $user->id,
                 'provider' => $provider,
@@ -278,10 +319,13 @@ class TransactionService
                 'metadata' => array_merge($metadata, [
                     'recipient_phone' => $recipientPhone,
                     'fee_config' => $feeResult,
+                    'tax_breakdown' => $taxResult,
                 ]),
+                'tax_breakdown' => $taxResult,
             ]);
 
             // Immediately debit wallet (will be refunded if payout fails)
+            // Total debit includes fee and tax
             $wallet->debit($amount, $transaction);
 
             // Record usage
@@ -316,6 +360,14 @@ class TransactionService
             // Record in accounting ledger
             $this->recordAccountingEntry($transaction);
 
+            // Record tax collection
+            if ($transaction->tax_amount > 0) {
+                $this->taxService->recordTaxCollection(
+                    $transaction,
+                    $transaction->tax_breakdown ?? $transaction->metadata['tax_breakdown'] ?? []
+                );
+            }
+
             // Record platform earnings
             if ($transaction->fee_amount > 0) {
                 $this->accountingService->recordEarnings(
@@ -328,6 +380,7 @@ class TransactionService
             Log::info('Withdrawal completed', [
                 'transaction_id' => $transaction->id,
                 'amount' => $transaction->amount,
+                'tax' => $transaction->tax_amount,
             ]);
         });
     }
@@ -348,7 +401,7 @@ class TransactionService
                 return;
             }
 
-            // Refund the source wallet
+            // Refund the source wallet (full amount including fee and tax)
             if ($transaction->source_wallet_id) {
                 $transaction->sourceWallet->credit($transaction->amount, $transaction);
             }
@@ -378,9 +431,13 @@ class TransactionService
         $feeResult = $this->calculateFee('transfer_internal', $amount, null, 'customer');
         $fee = $feeResult['fee'];
 
+        // Calculate tax
+        $taxResult = $this->calculateTax('transfer_p2p', $amount, $fee, null);
+        $tax = $taxResult['total_tax'];
+
         return DB::transaction(function () use (
             $sender, $recipient, $sourceWallet, $destWallet,
-            $amount, $fee, $feeResult, $description, $metadata
+            $amount, $fee, $tax, $feeResult, $taxResult, $description, $metadata
         ) {
             $transaction = Transaction::create([
                 'uuid' => Str::uuid(),
@@ -389,7 +446,8 @@ class TransactionService
                 'amount' => $amount,
                 'currency' => 'XOF',
                 'fee_amount' => $fee,
-                'net_amount' => $amount - $fee,
+                'tax_amount' => $tax,
+                'net_amount' => $amount - $fee - $tax,
                 'source_wallet_id' => $sourceWallet->id,
                 'source_user_id' => $sender->id,
                 'destination_wallet_id' => $destWallet->id,
@@ -398,19 +456,28 @@ class TransactionService
                 'status' => 'completed',
                 'completed_at' => now(),
                 'description' => $description,
-                'metadata' => array_merge($metadata, ['fee_config' => $feeResult]),
+                'metadata' => array_merge($metadata, [
+                    'fee_config' => $feeResult,
+                    'tax_breakdown' => $taxResult,
+                ]),
+                'tax_breakdown' => $taxResult,
             ]);
 
             // Execute transfer
             $sourceWallet->debit($amount, $transaction);
-            $destWallet->credit($amount - $fee, $transaction);
+            $destWallet->credit($amount - $fee - $tax, $transaction);
 
             // Record usage
             $this->walletLimitService->recordUsage($sourceWallet, $amount, 'transfer');
-            $this->walletLimitService->recordUsage($destWallet, $amount - $fee, 'deposit');
+            $this->walletLimitService->recordUsage($destWallet, $amount - $fee - $tax, 'deposit');
 
             // Record in accounting ledger
             $this->recordAccountingEntry($transaction);
+
+            // Record tax collection
+            if ($tax > 0) {
+                $this->taxService->recordTaxCollection($transaction, $taxResult);
+            }
 
             // Record platform earnings
             if ($fee > 0) {
@@ -426,6 +493,7 @@ class TransactionService
                 'sender' => $sender->id,
                 'recipient' => $recipient->id,
                 'amount' => $amount,
+                'tax' => $tax,
             ]);
 
             return $transaction;
@@ -446,6 +514,10 @@ class TransactionService
         $feeResult = $this->calculateFee('payment', $amount, null, 'merchant');
         $fee = $feeResult['fee'];
 
+        // Calculate tax (based on payment type)
+        $taxResult = $this->calculateTax('payment', $amount, $fee, null);
+        $tax = $taxResult['total_tax'];
+
         $transaction = Transaction::create([
             'uuid' => Str::uuid(),
             'reference' => Transaction::generateReference(),
@@ -453,11 +525,16 @@ class TransactionService
             'amount' => $amount,
             'currency' => 'XOF',
             'fee_amount' => $fee,
-            'net_amount' => $amount - $fee,
+            'tax_amount' => $tax,
+            'net_amount' => $amount - $fee - $tax,
             'destination_wallet_id' => $merchantWallet->id,
             'merchant_id' => $merchant->id,
             'status' => 'pending',
-            'metadata' => array_merge($metadata, ['fee_config' => $feeResult]),
+            'metadata' => array_merge($metadata, [
+                'fee_config' => $feeResult,
+                'tax_breakdown' => $taxResult,
+            ]),
+            'tax_breakdown' => $taxResult,
         ]);
 
         return $transaction;
@@ -494,7 +571,7 @@ class TransactionService
                 ]);
             }
 
-            // Credit merchant wallet
+            // Credit merchant wallet (net of fees and taxes)
             if ($transaction->destination_wallet_id) {
                 $merchantWallet = $transaction->destinationWallet;
                 $merchantWallet->credit($transaction->net_amount, $transaction);
@@ -514,6 +591,14 @@ class TransactionService
             // Record in accounting ledger
             $this->recordAccountingEntry($transaction);
 
+            // Record tax collection
+            if ($transaction->tax_amount > 0) {
+                $this->taxService->recordTaxCollection(
+                    $transaction,
+                    $transaction->tax_breakdown ?? $transaction->metadata['tax_breakdown'] ?? []
+                );
+            }
+
             // Record platform earnings
             if ($transaction->fee_amount > 0) {
                 $this->accountingService->recordEarnings(
@@ -527,13 +612,14 @@ class TransactionService
                 'transaction_id' => $transaction->id,
                 'merchant_id' => $transaction->merchant_id,
                 'amount' => $transaction->amount,
+                'tax' => $transaction->tax_amount,
                 'is_guest' => $isGuestPayment,
             ]);
         });
     }
 
     /**
-     * Record transaction in accounting ledger
+     * Record transaction in accounting ledger (including tax)
      */
     protected function recordAccountingEntry(Transaction $transaction): void
     {
@@ -546,6 +632,23 @@ class TransactionService
                 $transaction->fee_amount,
                 $providerFee
             );
+
+            // Record tax liability entries if applicable
+            if ($transaction->tax_amount > 0) {
+                $taxBreakdown = $transaction->tax_breakdown ?? $transaction->metadata['tax_breakdown'] ?? [];
+                $taxEntries = $this->taxService->getTaxLedgerEntries($transaction, $taxBreakdown);
+
+                if (!empty($taxEntries)) {
+                    $journalId = 'TAX-' . $transaction->reference;
+                    $this->accountingService->recordJournalEntry(
+                        $journalId,
+                        $taxEntries,
+                        'transaction_tax',
+                        $transaction->id,
+                        "Tax liability for {$transaction->type}"
+                    );
+                }
+            }
         } catch (\Exception $e) {
             // Log but don't fail the transaction
             Log::error('Failed to record accounting entry', [
@@ -606,7 +709,7 @@ class TransactionService
     }
 
     /**
-     * Get fee preview for transaction
+     * Get fee and tax preview for transaction
      */
     public function getFeePreview(
         string $transactionType,
@@ -615,13 +718,37 @@ class TransactionService
         string $accountType = 'customer'
     ): array {
         $feeResult = $this->calculateFee($transactionType, $amount, $provider, $accountType);
+        $taxResult = $this->calculateTax($transactionType, $amount, $feeResult['fee'], $provider);
 
         return [
             'amount' => $amount,
             'fee' => $feeResult['fee'],
-            'net_amount' => $amount - $feeResult['fee'],
+            'tax' => $taxResult['total_tax'],
+            'total_deductions' => $feeResult['fee'] + $taxResult['total_tax'],
+            'net_amount' => $amount - $feeResult['fee'] - $taxResult['total_tax'],
             'fee_type' => $feeResult['type'],
             'fee_rate' => $feeResult['rate'] ?? null,
+            'tax_breakdown' => array_map(function ($tax) {
+                return [
+                    'code' => $tax['config_code'],
+                    'type' => $tax['tax_type'],
+                    'authority' => $tax['authority'] ?? null,
+                    'amount' => $tax['tax'],
+                    'rate' => $tax['rate'],
+                ];
+            }, $taxResult['breakdown'] ?? []),
         ];
+    }
+
+    /**
+     * Get tax preview only
+     */
+    public function getTaxPreview(
+        string $transactionType,
+        float $amount,
+        float $feeAmount = 0,
+        ?string $provider = null
+    ): array {
+        return $this->taxService->getTaxPreview($transactionType, $amount, $feeAmount, $provider);
     }
 }
