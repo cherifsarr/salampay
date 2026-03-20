@@ -83,7 +83,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index(['is_active', 'effective_from', 'effective_until']);
+            $table->index(['is_active', 'effective_from', 'effective_until'], 'tax_cfg_active_dates_idx');
             $table->index('tax_type');
         });
 
