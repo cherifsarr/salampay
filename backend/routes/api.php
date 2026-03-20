@@ -168,4 +168,78 @@ Route::prefix('v1')->group(function () {
 
     });
 
+    // =================================================================
+    // ADMIN API ROUTES (Sanctum + Admin Middleware)
+    // =================================================================
+
+    Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
+
+        // Dashboard
+        Route::get('/dashboard/stats', [\App\Http\Controllers\Api\V1\Admin\DashboardController::class, 'stats']);
+        Route::get('/dashboard/chart-data', [\App\Http\Controllers\Api\V1\Admin\DashboardController::class, 'chartData']);
+        Route::get('/dashboard/recent-transactions', [\App\Http\Controllers\Api\V1\Admin\DashboardController::class, 'recentTransactions']);
+
+        // Customers
+        Route::prefix('customers')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Api\V1\Admin\CustomerController::class, 'index']);
+            Route::get('/{id}', [\App\Http\Controllers\Api\V1\Admin\CustomerController::class, 'show']);
+            Route::put('/{id}/status', [\App\Http\Controllers\Api\V1\Admin\CustomerController::class, 'updateStatus']);
+            Route::post('/{id}/verify-kyc', [\App\Http\Controllers\Api\V1\Admin\CustomerController::class, 'verifyKyc']);
+            Route::get('/{id}/transactions', [\App\Http\Controllers\Api\V1\Admin\CustomerController::class, 'transactions']);
+        });
+
+        // Merchants
+        Route::prefix('merchants')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Api\V1\Admin\MerchantController::class, 'index']);
+            Route::get('/{id}', [\App\Http\Controllers\Api\V1\Admin\MerchantController::class, 'show']);
+            Route::put('/{id}/status', [\App\Http\Controllers\Api\V1\Admin\MerchantController::class, 'updateStatus']);
+            Route::post('/{id}/verify-kyb', [\App\Http\Controllers\Api\V1\Admin\MerchantController::class, 'verifyKyb']);
+            Route::put('/{id}/fee-tier', [\App\Http\Controllers\Api\V1\Admin\MerchantController::class, 'updateFeeTier']);
+            Route::get('/{id}/transactions', [\App\Http\Controllers\Api\V1\Admin\MerchantController::class, 'transactions']);
+            Route::get('/{id}/api-keys', [\App\Http\Controllers\Api\V1\Admin\MerchantController::class, 'apiKeys']);
+        });
+
+        // Transactions
+        Route::prefix('transactions')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Api\V1\Admin\TransactionController::class, 'index']);
+            Route::get('/stats', [\App\Http\Controllers\Api\V1\Admin\TransactionController::class, 'stats']);
+            Route::get('/export', [\App\Http\Controllers\Api\V1\Admin\TransactionController::class, 'export']);
+            Route::get('/{id}', [\App\Http\Controllers\Api\V1\Admin\TransactionController::class, 'show']);
+            Route::post('/{id}/refund', [\App\Http\Controllers\Api\V1\Admin\TransactionController::class, 'refund']);
+        });
+
+        // Settlements
+        Route::prefix('settlements')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Api\V1\Admin\SettlementController::class, 'index']);
+            Route::get('/stats', [\App\Http\Controllers\Api\V1\Admin\SettlementController::class, 'stats']);
+            Route::get('/{id}', [\App\Http\Controllers\Api\V1\Admin\SettlementController::class, 'show']);
+            Route::post('/{id}/process', [\App\Http\Controllers\Api\V1\Admin\SettlementController::class, 'process']);
+            Route::post('/{id}/reject', [\App\Http\Controllers\Api\V1\Admin\SettlementController::class, 'reject']);
+            Route::post('/{id}/complete', [\App\Http\Controllers\Api\V1\Admin\SettlementController::class, 'complete']);
+        });
+
+        // Providers
+        Route::prefix('providers')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Api\V1\Admin\ProviderController::class, 'index']);
+            Route::get('/stats', [\App\Http\Controllers\Api\V1\Admin\ProviderController::class, 'stats']);
+            Route::get('/{id}', [\App\Http\Controllers\Api\V1\Admin\ProviderController::class, 'show']);
+            Route::put('/{id}/status', [\App\Http\Controllers\Api\V1\Admin\ProviderController::class, 'updateStatus']);
+            Route::put('/{id}/config', [\App\Http\Controllers\Api\V1\Admin\ProviderController::class, 'updateConfig']);
+            Route::post('/{id}/refresh-balance', [\App\Http\Controllers\Api\V1\Admin\ProviderController::class, 'refreshBalance']);
+        });
+
+        // Settings
+        Route::prefix('settings')->group(function () {
+            Route::get('/profile', [\App\Http\Controllers\Api\V1\Admin\SettingsController::class, 'profile']);
+            Route::put('/profile', [\App\Http\Controllers\Api\V1\Admin\SettingsController::class, 'updateProfile']);
+            Route::post('/password', [\App\Http\Controllers\Api\V1\Admin\SettingsController::class, 'changePassword']);
+            Route::get('/fees', [\App\Http\Controllers\Api\V1\Admin\SettingsController::class, 'getFees']);
+            Route::post('/fees', [\App\Http\Controllers\Api\V1\Admin\SettingsController::class, 'createFee']);
+            Route::put('/fees/{id}', [\App\Http\Controllers\Api\V1\Admin\SettingsController::class, 'updateFee']);
+            Route::get('/system', [\App\Http\Controllers\Api\V1\Admin\SettingsController::class, 'getSystemSettings']);
+            Route::get('/activity', [\App\Http\Controllers\Api\V1\Admin\SettingsController::class, 'activityLog']);
+        });
+
+    });
+
 });
