@@ -284,6 +284,19 @@ git push origin feature/your-feature
 - [x] Settings page with tabs for profile, security, notifications, fees, API
 - [x] Reusable components: StatsCard, StatusBadge, Pagination, Button, Loading
 
+#### Completed (Public Guest Checkout)
+- [x] Public checkout controller for guest payments (no SalamPay account required)
+- [x] Provider selection (Wave, Orange Money, Free Money, Wizall, E-Money)
+- [x] Public endpoints:
+  - `GET /checkout/providers` - List available payment providers
+  - `GET /checkout/sessions/{id}` - Resolve checkout session
+  - `POST /checkout/sessions/{id}/pay` - Pay with selected provider
+  - `POST /checkout/qr/resolve` - Resolve QR code data
+  - `POST /checkout/qr/pay` - Pay via QR code (guest)
+  - `GET /checkout/links/{code}` - Resolve payment link
+  - `POST /checkout/links/{code}/pay` - Pay via payment link (guest)
+  - `GET /checkout/status/{reference}` - Check payment status
+
 ### Phase 2: Core Features
 - [ ] User registration & OTP auth
 - [ ] Wallet top-up (Wave)
