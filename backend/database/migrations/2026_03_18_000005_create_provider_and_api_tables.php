@@ -9,21 +9,24 @@ return new class extends Migration
     public function up(): void
     {
         // Provider accounts (platform's connections to payment providers)
-        Schema::create('provider_accounts', function (Blueprint $table) {
-            $table->id();
-            $table->enum('provider', ['wave', 'orange_money', 'free_money', 'wizall', 'emoney', 'card_gateway']);
-            $table->string('account_name', 255);
-            $table->text('api_key_encrypted');
-            $table->text('webhook_secret_encrypted')->nullable();
-            $table->boolean('sandbox_mode')->default(false);
-            $table->decimal('balance', 15, 2)->default(0);
-            $table->timestamp('balance_updated_at')->nullable();
-            $table->enum('status', ['active', 'inactive', 'error'])->default('active');
-            $table->json('config')->nullable();
-            $table->timestamps();
+        // Skip if already created by treasury migration
+        if (!Schema::hasTable('provider_accounts')) {
+            Schema::create('provider_accounts', function (Blueprint $table) {
+                $table->id();
+                $table->enum('provider', ['wave', 'orange_money', 'free_money', 'wizall', 'emoney', 'card_gateway']);
+                $table->string('account_name', 255);
+                $table->text('api_key_encrypted');
+                $table->text('webhook_secret_encrypted')->nullable();
+                $table->boolean('sandbox_mode')->default(false);
+                $table->decimal('balance', 15, 2)->default(0);
+                $table->timestamp('balance_updated_at')->nullable();
+                $table->enum('status', ['active', 'inactive', 'error'])->default('active');
+                $table->json('config')->nullable();
+                $table->timestamps();
 
-            $table->index(['provider', 'status']);
-        });
+                $table->index(['provider', 'status']);
+            });
+        }
 
         // Provider webhooks log
         Schema::create('provider_webhooks', function (Blueprint $table) {
