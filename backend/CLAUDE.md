@@ -113,6 +113,50 @@ SalamPay/
   - E-Money
   - Card payments (Visa/Mastercard)
 
+### Treasury Module
+Manages fund flow between fiat custodian accounts (banks) and mobile merchant accounts.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      TREASURY SYSTEM                             │
+├─────────────────────────────────────────────────────────────────┤
+│  FIAT CUSTODIAN ACCOUNTS (Banks)                                │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐                      │
+│  │  CBAO    │  │  BICIS   │  │   BOA    │                      │
+│  │ Checking │  │  Sweep   │  │ Reserve  │                      │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘                      │
+│       └─────────────┼─────────────┘                             │
+│                     │                                            │
+│         ┌───────────▼───────────┐                               │
+│         │   TREASURY ENGINE     │                               │
+│         │  - Auto-Sweep (↑ cap) │                               │
+│         │  - Auto-Fund (↓ min)  │                               │
+│         │  - Reconciliation     │                               │
+│         │  - Double-Entry Book  │                               │
+│         └───────────┬───────────┘                               │
+│                     │                                            │
+│  MOBILE MERCHANT ACCOUNTS                                        │
+│  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐        │
+│  │  Wave  │ │ Orange │ │  Free  │ │ Wizall │ │E-Money │        │
+│  │ 10M cap│ │ 5M cap │ │ 5M cap │ │ 3M cap │ │ 3M cap │        │
+│  └────────┘ └────────┘ └────────┘ └────────┘ └────────┘        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+Key features:
+- **Auto-Sweep**: When mobile account exceeds cap → transfer to bank
+- **Auto-Fund**: When mobile account below minimum → request from bank
+- **Double-Entry Ledger**: Every transaction has debit/credit entries
+- **Balance Reconciliation**: Daily verification that books balance
+- **Balance Snapshots**: Hourly/daily snapshots for audit trail
+
+Artisan commands:
+```bash
+php artisan treasury:sweep      # Move excess funds to bank
+php artisan treasury:fund       # Fund low mobile accounts
+php artisan treasury:reconcile  # Verify book balance
+```
+
 ## Database
 
 Using PostgreSQL for better JSON support and ACID compliance.
@@ -124,12 +168,21 @@ Using PostgreSQL for better JSON support and ACID compliance.
 - `ledger_entries` - Double-entry bookkeeping
 - `merchants` - Merchant accounts
 - `merchant_stores` - Physical store locations
-- `provider_accounts` - Payment provider credentials
+- `provider_accounts` - Mobile money merchant accounts with caps
 - `qr_codes` - Static/dynamic QR codes
 - `payment_links` - Payment link records
 - `invoices` - Merchant invoices
 - `settlement_batches` - Settlement records
 - `api_keys` - Developer API keys
+
+### Treasury Tables
+- `custodian_accounts` - Bank accounts (checking, savings, sweep, reserve)
+- `provider_accounts` - Mobile money accounts with min/max/target balances
+- `treasury_transfers` - Fund movements between accounts
+- `treasury_ledger` - Double-entry bookkeeping for treasury
+- `balance_snapshots` - Point-in-time balance records
+- `treasury_rules` - Configurable sweep/fund automation rules
+- `reconciliation_reports` - Daily/weekly balance verification reports
 
 ## API Versioning
 
@@ -296,6 +349,30 @@ git push origin feature/your-feature
   - `GET /checkout/links/{code}` - Resolve payment link
   - `POST /checkout/links/{code}/pay` - Pay via payment link (guest)
   - `GET /checkout/status/{reference}` - Check payment status
+
+#### Completed (Treasury Management System)
+- [x] Database migrations for treasury tables
+- [x] Models:
+  - `CustodianAccount` - Bank accounts (checking, savings, sweep, reserve)
+  - `ProviderAccount` - Mobile money accounts with min/max/target balances
+  - `TreasuryTransfer` - Fund movement records
+  - `TreasuryLedger` - Double-entry bookkeeping
+  - `BalanceSnapshot` - Point-in-time balance records
+  - `ReconciliationReport` - Balance verification reports
+- [x] TreasuryService:
+  - Auto-sweep excess funds from mobile to bank
+  - Auto-fund low mobile accounts from bank
+  - Sync provider balances via API
+  - Treasury overview and alerts
+- [x] ReconciliationService:
+  - Daily reconciliation (Assets = Liabilities)
+  - Ledger integrity verification
+  - Balance snapshot creation
+  - Transaction flow analysis
+- [x] Artisan commands:
+  - `treasury:sweep` - Move excess funds to bank
+  - `treasury:fund` - Fund low mobile accounts
+  - `treasury:reconcile` - Verify book balance
 
 ### Phase 2: Core Features
 - [ ] User registration & OTP auth
